@@ -1,0 +1,62 @@
+{
+  "name": "claude-runner",
+  "version": "0.1.0",
+  "description": "GitHub Issue を Claude が自動実装・レビュー・PR作成するツール",
+  "keywords": [
+    "github",
+    "claude",
+    "ai",
+    "automation",
+    "issue",
+    "pull-request",
+    "code-generation"
+  ],
+  "bin": {
+    "claude-runner": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "type": "module",
+  "files": [
+    "dist",
+    "config.example.yaml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write 'src/**/*.ts'",
+    "type-check": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hisasann/claude-runner"
+  },
+  "author": "hisasann",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@octokit/rest": "^21.0.2",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.7",
+    "winston": "^3.17.0",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "eslint": "^9.18.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

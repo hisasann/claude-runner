@@ -1,0 +1,50 @@
+# Claude Runner 設定ファイル
+# このファイルをコピーして config.yaml を作成してください
+# cp config.example.yaml config.yaml
+
+github:
+  owner: "hisasann"
+  repo: "claude-runner"
+  token: "${GITHUB_TOKEN}"
+  labels:
+    - "claude-auto"
+  excludeLabels:
+    - "wontfix"
+    - "duplicate"
+    - "invalid"
+
+git:
+  baseBranch: "main"
+  worktreeDir: ".worktrees"
+  branchPrefix: "claude/issue-"
+  commitMessageTemplate: |
+    Fix #{{issue_number}}: {{issue_title}}
+
+    {{issue_body}}
+
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+claude:
+  apiKey: "${ANTHROPIC_API_KEY}"
+  model: "claude-sonnet-4-5-20250929"
+  maxRetries: 3
+  timeout: 300000
+  temperature: 0.0
+  maxTokens: 8000
+
+workflow:
+  autoReview: true
+  reviewIterations: 2
+  autoCreatePR: true
+  autoPush: false  # 安全のため false を推奨
+  maxConcurrency: 1
+  runTests: false  # テストコマンドがない場合は false
+  testCommand: "npm test"
+  buildBeforeTest: true
+  buildCommand: "npm run build"
+
+logging:
+  level: "info"
+  outputDir: "logs"
+  maxFiles: 30
+  maxSize: "10m"
