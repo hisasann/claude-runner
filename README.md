@@ -32,8 +32,8 @@ ANTHROPIC_API_KEY=sk-ant-xxxxx
 ## 使い方
 
 ```bash
-# すべてのclaude-autoラベル付きIssueを処理
-claude-runner
+# ラベル指定でIssueを自動取得して処理（明示オプトイン）
+claude-runner --auto
 
 # 特定Issueのみ処理
 claude-runner --issue 123
@@ -42,9 +42,20 @@ claude-runner --issue 123
 claude-runner -i 1,2,3
 claude-runner --issues 1,2,3
 
+# 設定ファイルの場所を指定
+claude-runner --config /path/to/claude-runner.yaml --auto
+
 # 詳細ログ
 claude-runner --verbose
 ```
+
+※ `--issue/--issues/--auto` のいずれも指定しない場合はエラーになります
+
+### よく使う設定
+
+- `workflow.maxConcurrency`: 並列で処理するIssue数（`--auto` 時に有効）
+- `workflow.runTests`: 実装後に `testCommand` を実行するかどうか
+- `workflow.buildBeforeTest`: テスト前に `buildCommand` を実行するかどうか
 
 ## 詳細ドキュメント
 
