@@ -2,42 +2,38 @@
 
 import { loadConfig } from './config/loader.js';
 import { initLogger } from './utils/logger.js';
-import { GitHubClient } from './github/client.js';
+import { Orchestrator } from './orchestrator/index.js';
+import type { RunOptions } from './types/config.js';
 
 async function main() {
   try {
-    console.log('Claude Runner - Starting...\n');
+    console.log('🤖 Claude Runner - Starting...\n');
 
     // 設定ファイル読み込み
-    console.log('設定ファイルを読み込んでいます...');
+    console.log('Loading configuration...');
     const config = await loadConfig('config.yaml');
-    console.log('✓ 設定ファイル読み込み完了\n');
+    console.log('✓ Configuration loaded\n');
 
     // ロガー初期化
-    const logger = initLogger(config.logging);
-    logger.info('Claude Runner 起動');
-    logger.info('設定:', {
-      repo: `${config.github.owner}/${config.github.repo}`,
-      labels: config.github.labels,
-    });
+    initLogger(config.logging);
 
-    // GitHub クライアント初期化
-    const githubClient = new GitHubClient(config.github);
+    console.log('Repository:', `${config.github.owner}/${config.github.repo}`);
+    console.log('Labels:', config.github.labels.join(', '));
+    console.log('Model:', config.claude.model);
+    console.log();
 
-    // Issue 取得テスト
-    logger.info('Issueを取得中...');
-    const issues = await githubClient.getIssues(config.github.labels);
+    // オプション
+    const options: RunOptions = {
+      config: 'config.yaml',
+      push: config.workflow.autoPush,
+      pr: config.workflow.autoCreatePR,
+    };
 
-    console.log(`\n取得したIssue: ${issues.length}件\n`);
-    issues.forEach((issue) => {
-      console.log(`  #${issue.number}: ${issue.title}`);
-      console.log(`    Labels: ${issue.labels.map((l) => l.name).join(', ')}`);
-      console.log(`    URL: ${issue.html_url}\n`);
-    });
-
-    logger.info('動作確認完了');
-  } catch (error) {
-    console.error('Error:', error);
+    // Orchestrator実行
+    const orchestrator = new Orchestrator(config);
+    await orchestrator.run(options);
+  } catch (error: any) {
+    console.error('\n❌ Error:', error.message);
     process.exit(1);
   }
 }

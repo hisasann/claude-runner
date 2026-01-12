@@ -15,10 +15,8 @@ export interface WorktreeOptions {
 }
 
 export class GitManager {
-  private config: GitConfig;
-
-  constructor(config: GitConfig) {
-    this.config = config;
+  constructor(_config: GitConfig) {
+    // 将来の拡張のために保持
   }
 
   /**
@@ -45,7 +43,7 @@ export class GitManager {
       const command = `git worktree add "${worktreePath}" -b "${branch}" "${baseBranch}"`;
       logger.debug(`Executing: ${command}`);
 
-      const { stdout, stderr } = await execAsync(command);
+      const { stderr } = await execAsync(command);
 
       if (stderr && !stderr.includes('Preparing worktree')) {
         logger.warn(`Git worktree stderr: ${stderr}`);

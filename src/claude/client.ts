@@ -1,8 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
+import type { MessageParam } from '@anthropic-ai/sdk/resources/messages.js';
 import type { ClaudeConfig } from '../types/config.js';
 import type { Issue } from '../types/github.js';
 import type { ImplementResult, ReviewResult } from '../types/claude.js';
 import { getLogger } from '../utils/logger.js';
+import { FILE_TOOLS, executeTool } from './tools.js';
 
 const logger = getLogger();
 
@@ -20,41 +22,127 @@ export class ClaudeClient {
   }
 
   /**
-   * Issueを実装
+   * Issueを実装（Tool useループ付き）
    */
   async implement(issue: Issue, worktreePath: string): Promise<ImplementResult> {
-    const prompt = this.buildImplementPrompt(issue, worktreePath);
+    const initialPrompt = this.buildImplementPrompt(issue, worktreePath);
 
     try {
       logger.info(`Claude: Implementing issue #${issue.number}`);
-      logger.debug(`Prompt length: ${prompt.length} characters`);
+      logger.debug(`Prompt length: ${initialPrompt.length} characters`);
 
-      const message = await this.anthropic.messages.create({
-        model: this.config.model,
-        max_tokens: this.config.maxTokens,
-        temperature: this.config.temperature,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-      });
+      // 会話履歴を保持
+      const messages: MessageParam[] = [
+        {
+          role: 'user',
+          content: initialPrompt,
+        },
+      ];
 
-      // レスポンスからテキストを抽出
-      const textContent = message.content.find((block) => block.type === 'text');
-      const responseText = textContent && 'text' in textContent ? textContent.text : '';
+      let totalTokens = 0;
+      let iterations = 0;
+      const maxIterations = 20; // 無限ループ防止
+      let filesChanged = 0;
 
-      logger.info(`Claude: Implementation completed`, {
-        tokensUsed: message.usage.input_tokens + message.usage.output_tokens,
-        stopReason: message.stop_reason,
-      });
+      // Tool useループ
+      while (iterations < maxIterations) {
+        iterations++;
+        logger.debug(`Claude: Iteration ${iterations}`);
+
+        const message = await this.anthropic.messages.create({
+          model: this.config.model,
+          max_tokens: this.config.maxTokens,
+          temperature: this.config.temperature,
+          tools: FILE_TOOLS,
+          messages,
+        });
+
+        totalTokens += message.usage.input_tokens + message.usage.output_tokens;
+
+        logger.debug(`Claude: Stop reason: ${message.stop_reason}`);
+
+        // Tool useブロックを処理
+        const toolUseBlocks = message.content.filter((block) => block.type === 'tool_use');
+
+        if (toolUseBlocks.length === 0) {
+          // ツール使用なし = 完了
+          const textContent = message.content.find((block) => block.type === 'text');
+          const responseText = textContent && 'text' in textContent ? textContent.text : '';
+
+          logger.info(`Claude: Implementation completed`, {
+            iterations,
+            filesChanged,
+            totalTokens,
+            stopReason: message.stop_reason,
+          });
+
+          return {
+            success: true,
+            filesChanged,
+            message: responseText,
+            tokensUsed: totalTokens,
+          };
+        }
+
+        // Assistantの応答を会話履歴に追加
+        messages.push({
+          role: 'assistant',
+          content: message.content,
+        });
+
+        // 各ツールを実行
+        const toolResults = [];
+        for (const block of toolUseBlocks) {
+          if (block.type !== 'tool_use') continue;
+
+          const toolName = block.name;
+          const toolInput = block.input;
+          const toolUseId = block.id;
+
+          logger.info(`Claude: Using tool: ${toolName}`, { input: toolInput });
+
+          try {
+            const result = await executeTool(toolName, toolInput, worktreePath);
+
+            // write_fileの場合はファイル変更をカウント
+            if (toolName === 'write_file') {
+              filesChanged++;
+            }
+
+            toolResults.push({
+              type: 'tool_result' as const,
+              tool_use_id: toolUseId,
+              content: result,
+            });
+
+            logger.debug(`Claude: Tool result: ${result.substring(0, 100)}...`);
+          } catch (error: any) {
+            toolResults.push({
+              type: 'tool_result' as const,
+              tool_use_id: toolUseId,
+              content: `Error: ${error.message}`,
+              is_error: true,
+            });
+
+            logger.error(`Claude: Tool execution failed`, { toolName, error: error.message });
+          }
+        }
+
+        // Tool resultsを会話履歴に追加
+        messages.push({
+          role: 'user',
+          content: toolResults,
+        });
+      }
+
+      // 最大イテレーション到達
+      logger.warn(`Claude: Max iterations reached (${maxIterations})`);
 
       return {
-        success: true,
-        filesChanged: 0, // TODO: 実際のファイル変更数をカウント
-        message: responseText,
-        tokensUsed: message.usage.input_tokens + message.usage.output_tokens,
+        success: false,
+        filesChanged,
+        message: `Implementation incomplete: reached max iterations (${maxIterations})`,
+        tokensUsed: totalTokens,
       };
     } catch (error: any) {
       logger.error(`Claude: Implementation failed`, { error: error.message });
@@ -124,16 +212,27 @@ ${issueBody}
 # Working Directory
 ${worktreePath}
 
+# Available Tools
+You have access to the following file operation tools:
+- read_file: Read file contents
+- write_file: Create or overwrite a file
+- list_directory: List files and directories
+- create_directory: Create a directory
+
 # Requirements
-- Follow existing code style and architecture
-- Add tests if necessary
+- Use the tools to implement the changes directly
+- Follow existing code style and architecture (use read_file to check existing code)
+- Add tests if the issue requests it
 - Consider edge cases
 - Pay attention to security (avoid XSS, SQL injection, etc.)
 - Keep the implementation simple and focused
 
-# Implementation
-Please provide a detailed implementation plan and the code changes needed.
-Explain what files need to be created or modified and what the changes should be.`;
+# Instructions
+1. First, use list_directory and read_file to explore the project structure if needed
+2. Create or modify the necessary files using write_file
+3. When done, provide a brief summary of what you implemented
+
+Please proceed with the implementation.`;
   }
 
   /**
