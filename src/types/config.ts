@@ -52,6 +52,7 @@ export interface LoggingConfig {
 export interface RunOptions {
   config: string;
   issue?: string;
+  issues?: number[];
   dryRun?: boolean;
   push?: boolean;
   pr?: boolean;

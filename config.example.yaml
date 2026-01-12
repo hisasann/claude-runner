@@ -1,50 +1,55 @@
-# Claude Runner 設定ファイル
-# このファイルをコピーして config.yaml を作成してください
-# cp config.example.yaml config.yaml
+# Claude Runner 設定ファイル # このファイルが設定テンプレートであることの説明
+# このファイルをコピーして config.yaml を作成してください # 実運用では config.yaml を使う案内
+# cp config.example.yaml config.yaml # コピーコマンド例
+# --- # 区切り
 
-github:
-  owner: "hisasann"
-  repo: "claude-runner"
-  token: "${GITHUB_TOKEN}"
-  labels:
-    - "claude-auto"
-  excludeLabels:
-    - "wontfix"
-    - "duplicate"
-    - "invalid"
+github: # GitHub 関連設定のまとまり
+  owner: "hisasann" # GitHub のオーナー名（ユーザー名または組織名）
+  repo: "claude-runner" # 対象リポジトリ名
+  token: "${GITHUB_TOKEN}" # GitHub API トークン（環境変数展開）
+  labels: # 取得対象にする Issue ラベル一覧
+    - "claude-auto" # 自動実行対象のラベル名
+  excludeLabels: # 除外したい Issue ラベル一覧
+    - "wontfix" # 対応しない Issue のラベル
+    - "duplicate" # 重複 Issue のラベル
+    - "invalid" # 無効 Issue のラベル
+# --- # 区切り
 
-git:
-  baseBranch: "main"
-  worktreeDir: ".worktrees"
-  branchPrefix: "claude/issue-"
-  commitMessageTemplate: |
-    Fix #{{issue_number}}: {{issue_title}}
+git: # Git 操作関連設定のまとまり
+  baseBranch: "main" # PR のベースブランチ
+  worktreeDir: ".worktrees" # worktree を作成するディレクトリ
+  branchPrefix: "claude/issue-" # Issue 用ブランチ名の接頭辞
+  commitMessageTemplate: | # コミットメッセージのテンプレート（複数行）
+    Fix #{{issue_number}}: {{issue_title}} # Issue 番号とタイトルを入れる
 
-    {{issue_body}}
+    {{issue_body}} # Issue 本文を差し込む
 
-    Co-Authored-By: Claude <noreply@anthropic.com>
+    Co-Authored-By: Claude <noreply@anthropic.com> # Co-Author 記載
+# --- # 区切り
 
-claude:
-  apiKey: "${ANTHROPIC_API_KEY}"
-  model: "claude-sonnet-4-5-20250929"
-  maxRetries: 3
-  timeout: 300000
-  temperature: 0.0
-  maxTokens: 8000
+claude: # Claude API 関連設定のまとまり
+  apiKey: "${ANTHROPIC_API_KEY}" # Anthropic API キー（環境変数展開）
+  model: "claude-sonnet-4-5-20250929" # 使用する Claude モデル名
+  maxRetries: 3 # API リトライ回数の上限
+  timeout: 300000 # API タイムアウト（ミリ秒）
+  temperature: 0.0 # 生成のランダム性（0.0〜1.0）
+  maxTokens: 8000 # 1リクエストの最大出力トークン数
+# --- # 区切り
 
-workflow:
-  autoReview: true
-  reviewIterations: 2
-  autoCreatePR: true
-  autoPush: false  # 安全のため false を推奨
-  maxConcurrency: 1
-  runTests: false  # テストコマンドがない場合は false
-  testCommand: "npm test"
-  buildBeforeTest: true
-  buildCommand: "npm run build"
+workflow: # 実行フロー関連設定のまとまり
+  autoReview: true # Claude による自動レビューを有効化
+  reviewIterations: 2 # レビュー修正ループの最大回数
+  autoCreatePR: true # 自動で PR を作成するかどうか
+  autoPush: false  # 安全のため false を推奨 # 自動で push するかどうか
+  maxConcurrency: 1 # 同時並列で処理する Issue 数
+  runTests: false  # テストコマンドがない場合は false # 実装後にテストを実行するか
+  testCommand: "npm test" # テスト実行コマンド
+  buildBeforeTest: true # テスト前にビルドを実行するか
+  buildCommand: "npm run build" # ビルド実行コマンド
+# --- # 区切り
 
-logging:
-  level: "info"
-  outputDir: "logs"
-  maxFiles: 30
-  maxSize: "10m"
+logging: # ログ出力設定のまとまり
+  level: "info" # ログレベル（error/warn/info/debug）
+  outputDir: "logs" # ログ出力ディレクトリ
+  maxFiles: 30 # ログの保持世代数
+  maxSize: "10m" # 1ファイルの最大サイズ

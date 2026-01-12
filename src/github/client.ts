@@ -33,7 +33,7 @@ export class GitHubClient {
    */
   async getIssues(labels: string[]): Promise<Issue[]> {
     try {
-      const response = await this.octokit.rest.issues.listForRepo({
+      const issues = await this.octokit.paginate(this.octokit.rest.issues.listForRepo, {
         owner: this.config.owner,
         repo: this.config.repo,
         state: 'open',
@@ -43,8 +43,10 @@ export class GitHubClient {
         per_page: 100,
       });
 
-      logger.info(`GitHub: ${response.data.length}件のIssueを取得しました`);
-      return response.data as Issue[];
+      const filtered = (issues as Issue[]).filter((issue) => !issue.pull_request);
+
+      logger.info(`GitHub: ${filtered.length}件のIssueを取得しました`);
+      return filtered;
     } catch (error) {
       logger.error('GitHub: Issue一覧の取得に失敗', { error });
       throw new Error(`GitHub APIエラー: ${error}`);
@@ -63,7 +65,11 @@ export class GitHubClient {
       });
 
       logger.info(`GitHub: Issue #${issueNumber} を取得しました`);
-      return response.data as Issue;
+      const issue = response.data as Issue;
+      if (issue.pull_request) {
+        throw new Error(`Issue #${issueNumber} is a pull request, not an issue`);
+      }
+      return issue;
     } catch (error) {
       logger.error(`GitHub: Issue #${issueNumber} の取得に失敗`, { error });
       throw new Error(`GitHub APIエラー: ${error}`);

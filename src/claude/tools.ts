@@ -87,7 +87,7 @@ export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   read_file: {
     name: 'read_file',
     execute: async (input: { path: string }, workingDir: string): Promise<string> => {
-      const filePath = path.join(workingDir, input.path);
+      const filePath = resolveSafePath(workingDir, input.path);
       logger.debug(`Reading file: ${filePath}`);
 
       try {
@@ -97,7 +97,7 @@ export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
       } catch (error: any) {
         const errorMsg = `Failed to read file: ${error.message}`;
         logger.error(errorMsg);
-        return errorMsg;
+        throw new Error(errorMsg);
       }
     },
   },
@@ -108,7 +108,7 @@ export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
       input: { path: string; content: string },
       workingDir: string
     ): Promise<string> => {
-      const filePath = path.join(workingDir, input.path);
+      const filePath = resolveSafePath(workingDir, input.path);
       logger.debug(`Writing file: ${filePath}`);
 
       try {
@@ -124,7 +124,7 @@ export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
       } catch (error: any) {
         const errorMsg = `Failed to write file: ${error.message}`;
         logger.error(errorMsg);
-        return errorMsg;
+        throw new Error(errorMsg);
       }
     },
   },
@@ -132,7 +132,7 @@ export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   list_directory: {
     name: 'list_directory',
     execute: async (input: { path: string }, workingDir: string): Promise<string> => {
-      const dirPath = path.join(workingDir, input.path);
+      const dirPath = resolveSafePath(workingDir, input.path);
       logger.debug(`Listing directory: ${dirPath}`);
 
       try {
@@ -149,7 +149,7 @@ export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
       } catch (error: any) {
         const errorMsg = `Failed to list directory: ${error.message}`;
         logger.error(errorMsg);
-        return errorMsg;
+        throw new Error(errorMsg);
       }
     },
   },
@@ -157,7 +157,7 @@ export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   create_directory: {
     name: 'create_directory',
     execute: async (input: { path: string }, workingDir: string): Promise<string> => {
-      const dirPath = path.join(workingDir, input.path);
+      const dirPath = resolveSafePath(workingDir, input.path);
       logger.debug(`Creating directory: ${dirPath}`);
 
       try {
@@ -167,7 +167,7 @@ export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
       } catch (error: any) {
         const errorMsg = `Failed to create directory: ${error.message}`;
         logger.error(errorMsg);
-        return errorMsg;
+        throw new Error(errorMsg);
       }
     },
   },
@@ -188,4 +188,21 @@ export async function executeTool(
   }
 
   return await executor.execute(toolInput, workingDir);
+}
+
+function resolveSafePath(workingDir: string, inputPath: string): string {
+  const resolvedWorkingDir = path.resolve(workingDir);
+  const resolvedPath = path.resolve(resolvedWorkingDir, inputPath);
+  const relativePath = path.relative(resolvedWorkingDir, resolvedPath);
+
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    throw new Error('Path escapes the working directory');
+  }
+
+  const segments = relativePath.split(path.sep);
+  if (segments.includes('.git')) {
+    throw new Error('Access to .git is not allowed');
+  }
+
+  return resolvedPath;
 }

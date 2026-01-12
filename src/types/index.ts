@@ -22,13 +22,15 @@ export interface Report {
 }
 
 export type ErrorType =
-  | 'test-failure'
-  | 'build-error'
-  | 'git-error'
-  | 'claude-api-error'
-  | 'github-api-error'
-  | 'timeout'
-  | 'unknown';
+  | 'git_error'
+  | 'github_api_error'
+  | 'claude_api_error'
+  | 'test_error'
+  | 'build_error'
+  | 'network_error'
+  | 'validation_error'
+  | 'timeout_error'
+  | 'unknown_error';
 
 export interface Context {
   config: import('./config.js').Config;

@@ -46,9 +46,15 @@ export class Orchestrator {
 
       logger.info(`Found ${issues.length} issue(s) to process`);
 
-      // 各Issueを処理
-      for (const issue of issues) {
-        await this.processIssue(issue, options);
+      const concurrency = Math.max(1, this.config.workflow.maxConcurrency || 1);
+      if (concurrency > 1 && issues.length > 1) {
+        logger.info(`Processing issues with concurrency: ${concurrency}`);
+        await this.processIssuesWithConcurrency(issues, options, concurrency);
+      } else {
+        // 各Issueを順次処理
+        for (const issue of issues) {
+          await this.processIssue(issue, options);
+        }
       }
 
       // レポート生成
@@ -59,7 +65,7 @@ export class Orchestrator {
       try {
         const reportFile = await this.stats.saveReport(report, this.config.logging?.outputDir || 'logs');
         logger.info(`Report saved to: ${reportFile}`);
-      } catch (error) {
+      } catch {
         logger.warn('Failed to save report, but continuing...');
       }
 
@@ -74,9 +80,31 @@ export class Orchestrator {
    * Issueを取得（一覧 or 単一）
    */
   private async fetchIssues(options: RunOptions): Promise<Issue[]> {
-    // 特定Issue指定の場合
+    // 特定Issue指定の場合（複数対応）
+    if (options.issues && options.issues.length > 0) {
+      const uniqueNumbers = Array.from(new Set(options.issues));
+      logger.info(`Fetching specific issues: ${uniqueNumbers.join(', ')}`);
+
+      const issues = await Promise.all(
+        uniqueNumbers.map(async (issueNumber) => {
+          const issue = await this.githubClient.getIssue(issueNumber);
+          if (issue.state !== 'open') {
+            throw new Error(`Issue #${issueNumber} is not open`);
+          }
+          logger.info(`✓ Issue #${issue.number}: ${issue.title}`);
+          return issue;
+        })
+      );
+
+      return issues;
+    }
+
     if (options.issue) {
       const issueNumber = parseInt(options.issue, 10);
+      if (Number.isNaN(issueNumber)) {
+        throw new Error(`Invalid issue number: ${options.issue}`);
+      }
+
       logger.info(`Fetching specific issue #${issueNumber}`);
 
       const issue = await this.githubClient.getIssue(issueNumber);
@@ -110,7 +138,7 @@ export class Orchestrator {
     if (this.config.github.excludeLabels && this.config.github.excludeLabels.length > 0) {
       filtered = filtered.filter((issue) => {
         const hasExcludedLabel = issue.labels.some((label) =>
-          this.config.github.excludeLabels?.includes(label.name)
+          this.config.github.excludeLabels?.includes(this.getLabelName(label))
         );
         return !hasExcludedLabel;
       });
@@ -122,7 +150,7 @@ export class Orchestrator {
     // 処理済み・失敗済みを除外
     filtered = filtered.filter((issue) => {
       const hasProcessingLabel = issue.labels.some((label) =>
-        ['claude-processing', 'claude-completed', 'claude-failed'].includes(label.name)
+        ['claude-processing', 'claude-completed', 'claude-failed'].includes(this.getLabelName(label))
       );
       return !hasProcessingLabel;
     });
@@ -142,6 +170,18 @@ export class Orchestrator {
     console.log(`${'='.repeat(60)}\n`);
 
     logger.info(`Processing issue #${issueNumber}`);
+
+    if (options.dryRun) {
+      console.log('🧪 Dry run: no changes will be made for this issue.');
+      console.log(`Would create worktree at: ${this.config.git.worktreeDir}/issue-${issueNumber}`);
+      console.log(`Would use branch: ${this.config.git.branchPrefix}${issueNumber}`);
+      console.log(`Would run Claude implementation and tests, then optionally push/PR.`);
+
+      const duration = Date.now() - startTime;
+      this.stats.recordSuccess(issueNumber, duration);
+      console.log(`✅ Issue #${issueNumber} dry-run completed\n`);
+      return;
+    }
 
     // 処理中ラベルを追加
     await this.githubClient.addLabel(issueNumber, 'claude-processing');
@@ -172,27 +212,41 @@ export class Orchestrator {
         throw new Error('No changes were made');
       }
 
-      // 4. コミット
-      console.log('3. Creating commit...');
+      // 4. レビュー（オプション）
+      if (this.config.workflow.autoReview && this.config.workflow.reviewIterations > 0) {
+        console.log('3. Reviewing changes with Claude...');
+        await this.runReviewLoop(issue, worktreePath);
+        console.log('✓ Review completed\n');
+      }
+
+      // 5. テスト（オプション）
+      if (this.config.workflow.runTests) {
+        console.log('4. Running tests...');
+        await this.runBuildAndTests(worktreePath);
+        console.log('✓ Tests completed\n');
+      }
+
+      // 6. コミット
+      console.log('5. Creating commit...');
       await this.gitManager.stageAll(worktreePath);
 
       const commitMessage = this.buildCommitMessage(issue);
       await this.gitManager.commit(worktreePath, commitMessage);
       console.log('✓ Commit created\n');
 
-      // 5. Push（オプション）
-      if (this.config.workflow.autoPush || options.push) {
-        console.log('4. Pushing to remote...');
+      // 7. Push（オプション）
+      if (this.shouldPush(options)) {
+        console.log('6. Pushing to remote...');
         await this.gitManager.push(worktreePath, 'origin', branchName);
         console.log('✓ Pushed to remote\n');
       } else {
         console.log('⊘ Skipping push (autoPush is disabled)\n');
       }
 
-      // 6. PR作成（オプション）
+      // 8. PR作成（オプション）
       let prUrl: string | undefined;
-      if (this.config.workflow.autoCreatePR && options.pr !== false) {
-        console.log('5. Creating pull request...');
+      if (this.shouldCreatePR(options)) {
+        console.log('7. Creating pull request...');
         const pr = await this.githubClient.createPR({
           owner: this.config.github.owner,
           repo: this.config.github.repo,
@@ -250,10 +304,102 @@ export class Orchestrator {
       try {
         await this.gitManager.removeWorktree(worktreePath);
         logger.debug(`Cleaned up worktree: ${worktreePath}`);
-      } catch (error) {
+      } catch {
         logger.warn(`Failed to clean up worktree: ${worktreePath}`);
       }
     }
+  }
+
+  /**
+   * 複数Issueを並列処理
+   */
+  private async processIssuesWithConcurrency(
+    issues: Issue[],
+    options: RunOptions,
+    concurrency: number
+  ): Promise<void> {
+    let index = 0;
+    const worker = async () => {
+      while (true) {
+        const currentIndex = index++;
+        if (currentIndex >= issues.length) break;
+        const issue = issues[currentIndex];
+        if (!issue) break;
+        await this.processIssue(issue, options);
+      }
+    };
+
+    const workers = Array.from({ length: Math.min(concurrency, issues.length) }, () => worker());
+    await Promise.all(workers);
+  }
+
+  /**
+   * レビューのループを実行
+   */
+  private async runReviewLoop(issue: Issue, worktreePath: string): Promise<void> {
+    for (let i = 0; i < this.config.workflow.reviewIterations; i++) {
+      const diff = await this.gitManager.getDiff(worktreePath);
+      if (!diff.trim()) {
+        logger.info('No diff found for review, skipping.');
+        return;
+      }
+
+      const review = await this.claudeClient.review(diff, issue);
+      if (!review.hasIssues) {
+        return;
+      }
+
+      logger.warn(`Review issues found (iteration ${i + 1}):`, review.issues);
+      const fixResult = await this.claudeClient.applyReviewFixes(
+        issue,
+        review.issues.join('\n'),
+        worktreePath
+      );
+      if (!fixResult.success) {
+        throw new Error(`Review fix attempt failed: ${fixResult.message || 'unknown error'}`);
+      }
+    }
+
+    // 最終レビュー
+    const finalDiff = await this.gitManager.getDiff(worktreePath);
+    if (!finalDiff.trim()) {
+      return;
+    }
+    const finalReview = await this.claudeClient.review(finalDiff, issue);
+    if (finalReview.hasIssues) {
+      throw new Error('Review failed: unresolved issues remain');
+    }
+  }
+
+  /**
+   * ビルド・テストを実行
+   */
+  private async runBuildAndTests(worktreePath: string): Promise<void> {
+    if (this.config.workflow.buildBeforeTest) {
+      try {
+        await this.gitManager.runCommand(worktreePath, this.config.workflow.buildCommand);
+      } catch (error: any) {
+        throw new Error(`Build failure: ${error.message}`);
+      }
+    }
+
+    try {
+      await this.gitManager.runCommand(worktreePath, this.config.workflow.testCommand);
+    } catch (error: any) {
+      throw new Error(`Test failure: ${error.message}`);
+    }
+  }
+
+  private shouldPush(options: RunOptions): boolean {
+    if (options.push === true) return true;
+    if (options.push === false) return false;
+    return this.config.workflow.autoPush;
+  }
+
+  private shouldCreatePR(options: RunOptions): boolean {
+    if (options.pr === true) return true;
+    if (options.pr === false) return false;
+    return this.config.workflow.autoCreatePR;
   }
 
   /**
@@ -292,5 +438,9 @@ Automated implementation by Claude Runner.
   private truncate(text: string, maxLength: number): string {
     if (text.length <= maxLength) return text;
     return text.substring(0, maxLength) + '...';
+  }
+
+  private getLabelName(label: Issue['labels'][number]): string {
+    return typeof label === 'string' ? label : label.name;
   }
 }

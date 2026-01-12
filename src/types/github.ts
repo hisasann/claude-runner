@@ -3,11 +3,12 @@ export interface Issue {
   title: string;
   body: string | null;
   state: 'open' | 'closed';
-  labels: Label[];
+  labels: Array<Label | string>;
   assignee: User | null;
   created_at: string;
   updated_at: string;
   html_url: string;
+  pull_request?: Record<string, unknown>;
 }
 
 export interface Label {

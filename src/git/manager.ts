@@ -40,7 +40,10 @@ export class GitManager {
       await fs.mkdir(parentDir, { recursive: true });
 
       // Worktreeを作成
-      const command = `git worktree add "${worktreePath}" -b "${branch}" "${baseBranch}"`;
+      const branchExists = await this.branchExists(branch);
+      const command = branchExists
+        ? `git worktree add "${worktreePath}" "${branch}"`
+        : `git worktree add "${worktreePath}" -b "${branch}" "${baseBranch}"`;
       logger.debug(`Executing: ${command}`);
 
       const { stderr } = await execAsync(command);
@@ -134,13 +137,16 @@ export class GitManager {
    */
   async commit(worktreePath: string, message: string): Promise<void> {
     try {
-      // HEREDOCを使ってコミットメッセージを渡す
-      const command = `git commit -m "$(cat <<'EOF'\n${message}\nEOF\n)"`;
+      const messageFileName = '.claude-runner-commit-msg.txt';
+      const messageFile = path.join(worktreePath, messageFileName);
+      await fs.writeFile(messageFile, message, 'utf-8');
+
+      const command = `git commit -F "${messageFileName}"`;
       logger.debug(`Executing commit in: ${worktreePath}`);
 
-      await execAsync(command, {
-        cwd: worktreePath,
-      });
+      await execAsync(command, { cwd: worktreePath });
+
+      await fs.unlink(messageFile).catch(() => undefined);
 
       logger.info(`Committed changes in: ${worktreePath}`);
     } catch (error: any) {
@@ -195,10 +201,26 @@ export class GitManager {
    */
   async branchExists(branch: string): Promise<boolean> {
     try {
-      const { stdout } = await execAsync(`git branch --list ${branch}`);
-      return stdout.trim().length > 0;
-    } catch (error: any) {
+      await execAsync(`git show-ref --verify --quiet "refs/heads/${branch}"`);
+      return true;
+    } catch {
       return false;
+    }
+  }
+
+  /**
+   * 任意コマンドを実行
+   */
+  async runCommand(worktreePath: string, command: string): Promise<{ stdout: string; stderr: string }> {
+    try {
+      const result = await execAsync(command, { cwd: worktreePath, maxBuffer: 10 * 1024 * 1024 });
+      return { stdout: result.stdout, stderr: result.stderr };
+    } catch (error: any) {
+      const stdout = error.stdout || '';
+      const stderr = error.stderr || '';
+      const combined = [stdout, stderr].filter(Boolean).join('\n').trim();
+      const snippet = combined ? `\n${combined.slice(0, 2000)}` : '';
+      throw new Error(`Command failed: ${command}${snippet}`);
     }
   }
 }

@@ -10,6 +10,8 @@ export type ErrorType =
   | 'git_error'
   | 'github_api_error'
   | 'claude_api_error'
+  | 'test_error'
+  | 'build_error'
   | 'network_error'
   | 'validation_error'
   | 'timeout_error'
@@ -52,6 +54,12 @@ export class ErrorHandler {
     }
     if (message.includes('claude') || message.includes('anthropic')) {
       return 'claude_api_error';
+    }
+    if (message.includes('test failure')) {
+      return 'test_error';
+    }
+    if (message.includes('build failure')) {
+      return 'build_error';
     }
     if (
       message.includes('network') ||
@@ -146,6 +154,8 @@ export class ErrorHandler {
       git_error: 'claude-error:git',
       github_api_error: 'claude-error:github',
       claude_api_error: 'claude-error:claude',
+      test_error: 'claude-error:test',
+      build_error: 'claude-error:build',
       network_error: 'claude-error:network',
       validation_error: 'claude-error:validation',
       timeout_error: 'claude-error:timeout',

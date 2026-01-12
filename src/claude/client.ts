@@ -26,128 +26,25 @@ export class ClaudeClient {
    */
   async implement(issue: Issue, worktreePath: string): Promise<ImplementResult> {
     const initialPrompt = this.buildImplementPrompt(issue, worktreePath);
+    logger.info(`Claude: Implementing issue #${issue.number}`);
+    logger.debug(`Prompt length: ${initialPrompt.length} characters`);
 
-    try {
-      logger.info(`Claude: Implementing issue #${issue.number}`);
-      logger.debug(`Prompt length: ${initialPrompt.length} characters`);
+    return this.runToolLoop(initialPrompt, worktreePath);
+  }
 
-      // 会話履歴を保持
-      const messages: MessageParam[] = [
-        {
-          role: 'user',
-          content: initialPrompt,
-        },
-      ];
+  /**
+   * レビュー指摘を反映
+   */
+  async applyReviewFixes(
+    issue: Issue,
+    reviewNotes: string,
+    worktreePath: string
+  ): Promise<ImplementResult> {
+    const prompt = this.buildReviewFixPrompt(issue, reviewNotes, worktreePath);
+    logger.info(`Claude: Applying review fixes for issue #${issue.number}`);
+    logger.debug(`Prompt length: ${prompt.length} characters`);
 
-      let totalTokens = 0;
-      let iterations = 0;
-      const maxIterations = 20; // 無限ループ防止
-      let filesChanged = 0;
-
-      // Tool useループ
-      while (iterations < maxIterations) {
-        iterations++;
-        logger.debug(`Claude: Iteration ${iterations}`);
-
-        const message = await this.anthropic.messages.create({
-          model: this.config.model,
-          max_tokens: this.config.maxTokens,
-          temperature: this.config.temperature,
-          tools: FILE_TOOLS,
-          messages,
-        });
-
-        totalTokens += message.usage.input_tokens + message.usage.output_tokens;
-
-        logger.debug(`Claude: Stop reason: ${message.stop_reason}`);
-
-        // Tool useブロックを処理
-        const toolUseBlocks = message.content.filter((block) => block.type === 'tool_use');
-
-        if (toolUseBlocks.length === 0) {
-          // ツール使用なし = 完了
-          const textContent = message.content.find((block) => block.type === 'text');
-          const responseText = textContent && 'text' in textContent ? textContent.text : '';
-
-          logger.info(`Claude: Implementation completed`, {
-            iterations,
-            filesChanged,
-            totalTokens,
-            stopReason: message.stop_reason,
-          });
-
-          return {
-            success: true,
-            filesChanged,
-            message: responseText,
-            tokensUsed: totalTokens,
-          };
-        }
-
-        // Assistantの応答を会話履歴に追加
-        messages.push({
-          role: 'assistant',
-          content: message.content,
-        });
-
-        // 各ツールを実行
-        const toolResults = [];
-        for (const block of toolUseBlocks) {
-          if (block.type !== 'tool_use') continue;
-
-          const toolName = block.name;
-          const toolInput = block.input;
-          const toolUseId = block.id;
-
-          logger.info(`Claude: Using tool: ${toolName}`, { input: toolInput });
-
-          try {
-            const result = await executeTool(toolName, toolInput, worktreePath);
-
-            // write_fileの場合はファイル変更をカウント
-            if (toolName === 'write_file') {
-              filesChanged++;
-            }
-
-            toolResults.push({
-              type: 'tool_result' as const,
-              tool_use_id: toolUseId,
-              content: result,
-            });
-
-            logger.debug(`Claude: Tool result: ${result.substring(0, 100)}...`);
-          } catch (error: any) {
-            toolResults.push({
-              type: 'tool_result' as const,
-              tool_use_id: toolUseId,
-              content: `Error: ${error.message}`,
-              is_error: true,
-            });
-
-            logger.error(`Claude: Tool execution failed`, { toolName, error: error.message });
-          }
-        }
-
-        // Tool resultsを会話履歴に追加
-        messages.push({
-          role: 'user',
-          content: toolResults,
-        });
-      }
-
-      // 最大イテレーション到達
-      logger.warn(`Claude: Max iterations reached (${maxIterations})`);
-
-      return {
-        success: false,
-        filesChanged,
-        message: `Implementation incomplete: reached max iterations (${maxIterations})`,
-        tokensUsed: totalTokens,
-      };
-    } catch (error: any) {
-      logger.error(`Claude: Implementation failed`, { error: error.message });
-      throw new Error(`Claude API error: ${error.message}`);
-    }
+    return this.runToolLoop(prompt, worktreePath);
   }
 
   /**
@@ -263,5 +160,147 @@ ${diff}
 # Review
 Please provide a detailed code review. If there are any issues or improvements needed, list them clearly.
 If the implementation looks good, indicate approval.`;
+  }
+
+  /**
+   * レビュー修正用のプロンプトを構築
+   */
+  private buildReviewFixPrompt(issue: Issue, reviewNotes: string, worktreePath: string): string {
+    const issueBody = issue.body || 'No description provided';
+
+    return `You are an expert software engineer. Apply the following review feedback.
+
+# Issue Information
+Issue #${issue.number}: ${issue.title}
+
+${issueBody}
+
+# Review Feedback
+${reviewNotes}
+
+# Working Directory
+${worktreePath}
+
+# Instructions
+- Use the available tools to update the code to address the review feedback
+- Keep changes minimal and focused
+- Preserve existing style and conventions
+- When finished, briefly summarize what you changed
+`;
+  }
+
+  /**
+   * Tool useループを実行
+   */
+  private async runToolLoop(prompt: string, worktreePath: string): Promise<ImplementResult> {
+    try {
+      const messages: MessageParam[] = [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ];
+
+      let totalTokens = 0;
+      let iterations = 0;
+      const maxIterations = 20; // 無限ループ防止
+      let filesChanged = 0;
+
+      while (iterations < maxIterations) {
+        iterations++;
+        logger.debug(`Claude: Iteration ${iterations}`);
+
+        const message = await this.anthropic.messages.create({
+          model: this.config.model,
+          max_tokens: this.config.maxTokens,
+          temperature: this.config.temperature,
+          tools: FILE_TOOLS,
+          messages,
+        });
+
+        totalTokens += message.usage.input_tokens + message.usage.output_tokens;
+
+        logger.debug(`Claude: Stop reason: ${message.stop_reason}`);
+
+        const toolUseBlocks = message.content.filter((block) => block.type === 'tool_use');
+
+        if (toolUseBlocks.length === 0) {
+          const textContent = message.content.find((block) => block.type === 'text');
+          const responseText = textContent && 'text' in textContent ? textContent.text : '';
+
+          logger.info(`Claude: Tool loop completed`, {
+            iterations,
+            filesChanged,
+            totalTokens,
+            stopReason: message.stop_reason,
+          });
+
+          return {
+            success: true,
+            filesChanged,
+            message: responseText,
+            tokensUsed: totalTokens,
+          };
+        }
+
+        messages.push({
+          role: 'assistant',
+          content: message.content,
+        });
+
+        const toolResults = [];
+        for (const block of toolUseBlocks) {
+          if (block.type !== 'tool_use') continue;
+
+          const toolName = block.name;
+          const toolInput = block.input;
+          const toolUseId = block.id;
+
+          logger.info(`Claude: Using tool: ${toolName}`, { input: toolInput });
+
+          try {
+            const result = await executeTool(toolName, toolInput, worktreePath);
+
+            if (toolName === 'write_file') {
+              filesChanged++;
+            }
+
+            toolResults.push({
+              type: 'tool_result' as const,
+              tool_use_id: toolUseId,
+              content: result,
+            });
+
+            logger.debug(`Claude: Tool result: ${result.substring(0, 100)}...`);
+          } catch (error: any) {
+            toolResults.push({
+              type: 'tool_result' as const,
+              tool_use_id: toolUseId,
+              content: `Error: ${error.message}`,
+              is_error: true,
+            });
+
+            logger.error(`Claude: Tool execution failed`, { toolName, error: error.message });
+          }
+        }
+
+        messages.push({
+          role: 'user',
+          content: toolResults,
+        });
+      }
+
+      logger.warn(`Claude: Max iterations reached (${maxIterations})`);
+
+      return {
+        success: false,
+        filesChanged,
+        message: `Implementation incomplete: reached max iterations (${maxIterations})`,
+        tokensUsed: totalTokens,
+      };
+    } catch (error: any) {
+      logger.error(`Claude: Tool loop failed`, { error: error.message });
+      throw new Error(`Claude API error: ${error.message}`);
+    }
   }
 }

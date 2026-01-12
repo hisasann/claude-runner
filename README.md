@@ -33,6 +33,10 @@ claude-runner
 # 特定Issueのみ処理
 claude-runner --issue 123
 
+# 複数Issueを指定して処理（カンマ区切り）
+claude-runner -i 1,2,3
+claude-runner --issues 1,2,3
+
 # 詳細ログ
 claude-runner --verbose
 ```
