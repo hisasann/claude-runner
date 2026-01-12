@@ -6,6 +6,7 @@ import { GitHubClient } from '../github/client.js';
 import { GitManager } from '../git/manager.js';
 import { ClaudeClient } from '../claude/client.js';
 import { Statistics } from '../utils/statistics.js';
+import { ErrorHandler } from '../utils/error.js';
 import { getLogger } from '../utils/logger.js';
 
 const logger = getLogger();
@@ -16,6 +17,7 @@ export class Orchestrator {
   private gitManager: GitManager;
   private claudeClient: ClaudeClient;
   private stats: Statistics;
+  private errorHandler: ErrorHandler;
 
   constructor(config: Config) {
     this.config = config;
@@ -23,6 +25,7 @@ export class Orchestrator {
     this.gitManager = new GitManager(config.git);
     this.claudeClient = new ClaudeClient(config.claude);
     this.stats = new Statistics();
+    this.errorHandler = new ErrorHandler();
   }
 
   /**
@@ -51,6 +54,14 @@ export class Orchestrator {
       // レポート生成
       const report = this.stats.generateReport();
       this.stats.printReport(report);
+
+      // レポート保存
+      try {
+        const reportFile = await this.stats.saveReport(report, this.config.logging?.outputDir || 'logs');
+        logger.info(`Report saved to: ${reportFile}`);
+      } catch (error) {
+        logger.warn('Failed to save report, but continuing...');
+      }
 
       return report;
     } catch (error) {
@@ -206,21 +217,34 @@ export class Orchestrator {
       console.log(`✅ Issue #${issueNumber} completed in ${Math.floor(duration / 1000)}s\n`);
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      logger.error(`Failed to process issue #${issueNumber}`, { error: error.message });
+
+      // エラーハンドラーでエラーを処理
+      const handleResult = await this.errorHandler.handle(error, {
+        issue,
+        issueNumber,
+        operation: 'processIssue',
+      });
 
       // 失敗ラベル
       await this.githubClient.removeLabel(issueNumber, 'claude-processing');
-      await this.githubClient.addLabel(issueNumber, 'claude-failed');
+      const errorLabel = this.errorHandler.getErrorLabel(handleResult.errorType);
+      await this.githubClient.addLabel(issueNumber, errorLabel);
 
       // Issueにコメント
+      const errorMessage = this.errorHandler.formatErrorMessage(error, handleResult.errorType, {
+        issue,
+        issueNumber,
+        operation: 'processIssue',
+      });
+
       await this.githubClient.addComment(
         issueNumber,
-        `⚠️ Automated implementation failed\n\n**Error**: ${error.message}\n\nPlease check the logs for details.`
+        `⚠️ Automated implementation failed\n\n${errorMessage}\n\nPlease check the logs for details.`
       );
 
-      this.stats.recordFailure(issueNumber, 'unknown', duration, error.message);
+      this.stats.recordFailure(issueNumber, handleResult.errorType, duration, error.message);
 
-      console.error(`❌ Issue #${issueNumber} failed: ${error.message}\n`);
+      console.error(`❌ Issue #${issueNumber} failed: ${handleResult.errorType} - ${error.message}\n`);
     } finally {
       // Worktree削除
       try {

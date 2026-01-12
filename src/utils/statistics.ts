@@ -1,3 +1,5 @@
+import fs from 'fs/promises';
+import path from 'path';
 import type { ProcessResult, Report } from '../types/index.js';
 import { getLogger } from './logger.js';
 
@@ -107,6 +109,29 @@ export class Statistics {
     }
 
     console.log('='.repeat(60) + '\n');
+  }
+
+  /**
+   * レポートをファイルに保存
+   */
+  async saveReport(report: Report, outputDir: string = 'logs'): Promise<string> {
+    try {
+      // ディレクトリを作成
+      await fs.mkdir(outputDir, { recursive: true });
+
+      // ファイル名を生成（タイムスタンプ付き）
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = path.join(outputDir, `report-${timestamp}.json`);
+
+      // レポートを保存
+      await fs.writeFile(filename, JSON.stringify(report, null, 2), 'utf-8');
+
+      logger.info(`Report saved: ${filename}`);
+      return filename;
+    } catch (error: any) {
+      logger.error(`Failed to save report: ${error.message}`);
+      throw error;
+    }
   }
 
   /**
