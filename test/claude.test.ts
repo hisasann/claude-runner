@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { ClaudeClient } from './claude/client.js';
-import { loadConfig } from './config/loader.js';
-import { initLogger } from './utils/logger.js';
-import type { Issue } from './types/github.js';
+import { ClaudeClient } from '../src/claude/client.js';
+import { loadConfig } from '../src/config/loader.js';
+import { initLogger } from '../src/utils/logger.js';
+import type { Issue } from '../src/types/github.js';
 
 const logger = initLogger({ level: 'info', outputDir: 'logs' });
 

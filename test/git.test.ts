@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import fs from 'fs/promises';
-import { GitManager } from './git/manager.js';
-import { initLogger } from './utils/logger.js';
+import { GitManager } from '../src/git/manager.js';
+import { initLogger } from '../src/utils/logger.js';
 
 const logger = initLogger({ level: 'debug', outputDir: 'logs' });
 
