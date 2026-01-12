@@ -8,7 +8,7 @@ describe('Add Utility', () => {
     expect(add(-3, 3)).toBe(0);
   });
 
-  it('should specifically add 1 and 1', () => {
+  it('should add 1 and 1 correctly', () => {
     expect(addOneAndOne()).toBe(2);
   });
 });

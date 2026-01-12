@@ -10,7 +10,7 @@ export function add(a: number, b: number): number {
 
 /**
  * Specifically adds 1 and 1
- * @returns 2
+ * @returns Result of 1 + 1
  */
 export function addOneAndOne(): number {
   return add(1, 1);
