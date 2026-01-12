@@ -27,6 +27,7 @@
     "dev": "tsx src/index.ts",
     "test:git": "tsx test/git.test.ts",
     "test:claude": "tsx test/claude.test.ts",
+    "test:cli": "tsx test/cli.test.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
