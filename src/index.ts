@@ -11,7 +11,7 @@ async function main() {
 
     // 設定ファイル読み込み
     console.log('Loading configuration...');
-    const config = await loadConfig('config.yaml');
+    const config = await loadConfig('claude-runner.yaml');
     console.log('✓ Configuration loaded\n');
 
     // ロガー初期化
@@ -24,7 +24,7 @@ async function main() {
 
     // オプション
     const options: RunOptions = {
-      config: 'config.yaml',
+      config: 'claude-runner.yaml',
       push: config.workflow.autoPush,
       pr: config.workflow.autoCreatePR,
     };

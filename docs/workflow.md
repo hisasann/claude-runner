@@ -59,7 +59,7 @@
 async function initialize(): Promise<Context> {
   // 設定ファイルパスの決定
   const configPath = process.env.CLAUDE_RUNNER_CONFIG ||
-                     path.join(process.cwd(), 'config.yaml');
+                     path.join(process.cwd(), 'claude-runner.yaml');
 
   // YAML読み込み
   const rawConfig = await fs.readFile(configPath, 'utf-8');
@@ -204,10 +204,10 @@ async function fetchIssues(
 **使用例**:
 ```bash
 # 全てのissueを処理
-claude-runner --config config.yaml
+claude-runner --config claude-runner.yaml
 
 # 特定のissueのみ処理
-claude-runner --config config.yaml --issue 123
+claude-runner --config claude-runner.yaml --issue 123
 ```
 
 ### 2.2 フィルタリングとソート

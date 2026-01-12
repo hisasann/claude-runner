@@ -19,7 +19,7 @@
   "type": "module",
   "files": [
     "dist",
-    "config.example.yaml",
+    "claude-runner.example.yaml",
     "README.md",
     "LICENSE"
   ],

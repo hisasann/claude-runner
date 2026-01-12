@@ -46,8 +46,8 @@ GitHub Issue を自動的に取得し、Claude Code を使って実装、レビ�
 
 ```
 claude-runner/
-├── config.yaml              # 設定ファイル（リポジトリには含めない）
-├── config.example.yaml      # 設定ファイルのテンプレート
+├── claude-runner.yaml              # 設定ファイル（リポジトリには含めない）
+├── claude-runner.example.yaml      # 設定ファイルのテンプレート
 ├── docs/
 │   ├── architecture.md      # このファイル
 │   ├── configuration.md     # 設定ファイルの詳細
@@ -418,8 +418,8 @@ class ErrorHandler {
 
 ### トークン管理
 - GitHub Token と Anthropic API Key は環境変数で管理
-- config.yaml はリポジトリにコミットしない（.gitignore に追加）
-- config.example.yaml をテンプレートとして提供
+- claude-runner.yaml はリポジトリにコミットしない（.gitignore に追加）
+- claude-runner.example.yaml をテンプレートとして提供
 
 ### 実装内容の検証
 - Claude の出力を盲目的に信頼しない

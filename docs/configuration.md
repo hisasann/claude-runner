@@ -1,6 +1,6 @@
 # 設定ファイル詳細
 
-## config.yaml の構造
+## claude-runner.yaml の構造
 
 ### 基本構造
 
@@ -304,7 +304,7 @@ export ANTHROPIC_API_KEY="sk-ant-xxxxxxxxxxxxxxxxxxxx"
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/xxx/yyy/zzz"
 
 # カスタム設定ファイルパス
-export CLAUDE_RUNNER_CONFIG="/path/to/config.yaml"
+export CLAUDE_RUNNER_CONFIG="/path/to/claude-runner.yaml"
 ```
 
 ### .env ファイルの使用
@@ -321,14 +321,14 @@ EOF
 echo ".env" >> .gitignore
 ```
 
-## config.example.yaml
+## claude-runner.example.yaml
 
 リポジトリに含める設定ファイルのテンプレート:
 
 ```yaml
 # Claude Runner 設定ファイル
-# このファイルをコピーして config.yaml を作成してください
-# cp config.example.yaml config.yaml
+# このファイルをコピーして claude-runner.yaml を作成してください
+# cp claude-runner.example.yaml claude-runner.yaml
 
 github:
   owner: "your-organization"
@@ -429,8 +429,8 @@ export type Config = z.infer<typeof configSchema>;
 ## セキュリティのベストプラクティス
 
 1. **トークンの管理**
-   - config.yaml をリポジトリにコミットしない
-   - .gitignore に config.yaml を追加
+   - claude-runner.yaml をリポジトリにコミットしない
+   - .gitignore に claude-runner.yaml を追加
    - 環境変数を使用
 
 2. **権限の最小化**

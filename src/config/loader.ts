@@ -11,7 +11,7 @@ dotenvConfig();
 /**
  * 設定ファイルを読み込む
  */
-export async function loadConfig(configPath: string = 'config.yaml'): Promise<Config> {
+export async function loadConfig(configPath: string = 'claude-runner.yaml'): Promise<Config> {
   // 設定ファイルのパスを解決
   const resolvedPath = path.resolve(process.cwd(), configPath);
 

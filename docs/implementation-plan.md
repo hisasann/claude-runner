@@ -81,7 +81,7 @@ npm test              # 全テスト実行（将来実装）
    - `.eslintrc.json`
    - `.prettierrc`
    - `.gitignore`
-   - `config.example.yaml`
+   - `claude-runner.example.yaml`
 
 4. **package.json のスクリプト設定**
    ```json
@@ -204,7 +204,7 @@ main().catch(console.error);
 - ログがコンソールとファイルに出力される
 
 ### 検証方法
-1. `config.yaml` を作成（GitHub Token を設定）
+1. `claude-runner.yaml` を作成（GitHub Token を設定）
 2. `npm run dev` を実行
 3. Issue 一覧が表示される
 4. `logs/` にログファイルが作成される
@@ -948,7 +948,7 @@ program
   .version('1.0.0');
 
 program
-  .option('-c, --config <path>', '設定ファイルのパス', 'config.yaml')
+  .option('-c, --config <path>', '設定ファイルのパス', 'claude-runner.yaml')
   .option('-i, --issue <number>', '特定の Issue のみ処理')
   .option('--dry-run', 'Dry run モード（実際の変更なし）')
   .option('--no-push', 'Push を無効化')
@@ -1050,7 +1050,7 @@ jobs:
 
 ### 1. セキュリティ
 - トークンを `.env` で管理
-- `config.yaml` を `.gitignore` に追加
+- `claude-runner.yaml` を `.gitignore` に追加
 - GitHub Token のスコープを最小限に
 
 ### 2. コスト管理

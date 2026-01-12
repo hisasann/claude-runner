@@ -16,7 +16,12 @@ GITHUB_TOKEN=ghp_xxxxx
 ANTHROPIC_API_KEY=sk-ant-xxxxx
 ```
 
-2. `config.yaml`を作成（`config.example.yaml`を参考に）
+2. `claude-runner.yaml`を作成（`claude-runner.example.yaml`を参考に）
+   ```bash
+   cp claude-runner.example.yaml claude-runner.yaml
+   ```
+   ※ `claude-runner` は実行時のカレントディレクトリにある `claude-runner.yaml` を読み込みます  
+   ※ 別の場所の設定を使う場合は `-c, --config <path>` でパス指定できます
 
 3. リポジトリにラベルを作成:
 - `claude-auto` - 処理対象

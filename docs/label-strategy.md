@@ -173,7 +173,7 @@ Closes #123
 ### パターン 1: 優先度管理
 
 ```yaml
-# config.yaml
+# claude-runner.yaml
 github:
   labels:
     - "claude-auto"

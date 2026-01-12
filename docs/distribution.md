@@ -14,12 +14,12 @@
 **グローバルインストール**:
 ```bash
 npm install -g claude-runner
-claude-runner --config ./config.yaml
+claude-runner --config ./claude-runner.yaml
 ```
 
 **npx で直接実行**:
 ```bash
-npx claude-runner --config ./config.yaml
+npx claude-runner --config ./claude-runner.yaml
 ```
 
 **プロジェクトローカル**:
@@ -97,7 +97,7 @@ program
   .name('claude-runner')
   .description('GitHub Issue の自動実装・レビュー・PR作成ツール')
   .version('1.0.0')
-  .option('-c, --config <path>', '設定ファイルのパス', 'config.yaml')
+  .option('-c, --config <path>', '設定ファイルのパス', 'claude-runner.yaml')
   .option('-i, --issue <number>', '特定の Issue のみ処理')
   .option('--dry-run', 'Dry run モード')
   .option('-v, --verbose', '詳細ログ')
@@ -125,7 +125,7 @@ program.parse();
 docker pull your-org/claude-runner:latest
 
 # Run
-docker run -v $(pwd)/config.yaml:/app/config.yaml \
+docker run -v $(pwd)/claude-runner.yaml:/app/claude-runner.yaml \
            -v $(pwd)/.git:/app/.git \
            -e GITHUB_TOKEN=$GITHUB_TOKEN \
            -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
@@ -182,7 +182,7 @@ curl -L https://github.com/your-org/claude-runner/releases/latest/download/claud
 chmod +x claude-runner
 
 # 実行
-./claude-runner --config config.yaml
+./claude-runner --config claude-runner.yaml
 ```
 
 #### メリット
@@ -223,7 +223,7 @@ jobs:
       - name: Run Claude Runner
         uses: your-org/claude-runner-action@v1
         with:
-          config: ./config.yaml
+          config: ./claude-runner.yaml
           github-token: ${{ secrets.GITHUB_TOKEN }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
@@ -366,7 +366,7 @@ npm install -g claude-runner
 
 1. 設定ファイルを作成:
 \`\`\`bash
-cp node_modules/claude-runner/config.example.yaml config.yaml
+cp node_modules/claude-runner/claude-runner.example.yaml claude-runner.yaml
 \`\`\`
 
 2. 環境変数を設定:
@@ -377,7 +377,7 @@ export ANTHROPIC_API_KEY="your-key"
 
 3. 実行:
 \`\`\`bash
-claude-runner --config config.yaml
+claude-runner --config claude-runner.yaml
 \`\`\`
 
 ## ドキュメント

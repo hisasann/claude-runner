@@ -14,7 +14,7 @@ program
   .version('0.1.0');
 
 program
-  .option('-c, --config <path>', 'Path to config file', 'config.yaml')
+  .option('-c, --config <path>', 'Path to config file', 'claude-runner.yaml')
   .option('-i, --issue <number>', 'Process specific issue(s), supports comma-separated list')
   .option('--issues <numbers>', 'Process specific issues (comma-separated list)')
   .option('--dry-run', 'Dry run mode (no actual changes)')
