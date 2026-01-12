@@ -15,6 +15,7 @@ dist/
 
 # Configuration (contains secrets)
 claude-runner.yaml
+.claude-test/
 
 # Git worktrees
 .worktrees/
